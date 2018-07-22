@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const gravatar = require('gravatar');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const keys = require('../../config/keys');
 
 // Load User model
 const User = require('../../models/User');
@@ -44,11 +46,11 @@ router.post('/register', (req, res) => {
                     newUser.password = hash;
                     newUser.save()
                         .then(user => res.json(user))
-                        .catch(err => console.log(err));
-                })
-            })
+                        .catch(err => console.log(err))
+                });
+            });
         }
-    })
+    });
 });
 
 // @route   GET api/users/login
@@ -60,30 +62,43 @@ router.post('/login', (req, res) => {
 
     // Find user by email
     User.findOne({
-            email
-        })
-        .then(user => {
-            // Check for user
-            if (!user) {
-                return res.status(404).json({
-                    email: 'User not found'
+        email
+    }).then(user => {
+        // Check for user
+        if (!user) {
+            return res.status(404).json({
+                email: 'User or password is not matching!'
+            });
+        }
+
+        // Check Password
+        bcrypt.compare(password, user.password).then(isMatch => {
+            if (isMatch) {
+                // User Matched
+
+                // Create JWT Payload
+                const payload = {
+                    id: user.id,
+                    name: user.name,
+                    avatar: user.avatar
+                };
+
+                // Sign Token
+                jwt.sign(payload, keys.secretOrKey, {
+                    expiresIn: 3600
+                }, (err, token) => {
+                    res.json({
+                        success: true,
+                        token: 'Bearer ' + token
+                    });
+                });
+            } else {
+                return res.status(400).json({
+                    password: 'User or password is not matching!'
                 });
             }
-
-            // Check Password
-            bcrypt.compare(password, user.password)
-                .then(isMatch => {
-                    if (isMatch) {
-                        res.json({
-                            msg: 'Success'
-                        });
-                    } else {
-                        return res.status(400).json({
-                            password: 'Passwrod incorrect'
-                        });
-                    }
-                });
         });
+    });
 })
 
 module.exports = router;
